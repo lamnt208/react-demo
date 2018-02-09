@@ -1,7 +1,7 @@
 
 import firebaseApp from 'containers/App/firebase';
 import ReduxSagaFirebase from 'redux-saga-firebase';
-import { take, call, put, select, cancel, takeLatest } from 'redux-saga/effects';
+import { take, call, put, cancel, takeLatest } from 'redux-saga/effects';
 import { LOCATION_CHANGE } from 'react-router-redux';
 import { loadDataItem } from './actions';
 
@@ -11,11 +11,11 @@ function* getListItem() {
   try {
     const response = yield call(reduxSagaFirebase.database.read, 'locations');
     const data = Array.from([]);
-    for(const key in response) {
-      if(response.hasOwnProperty(key)) {
+    for (const key in response) {
+      if (response.hasOwnProperty(key)) {
           data.push(response[key]);
       }
-  }
+    }
     yield put(loadDataItem(data));
   } catch (err) {
     // yield put(repoLoadingError(err));

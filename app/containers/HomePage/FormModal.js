@@ -1,13 +1,12 @@
 
 import React from 'react';
 import classNames from 'classnames';
-import { Modal, Button, Col, Row } from 'react-bootstrap';
+import { Modal, Button, Col, Row, HelpBlock } from 'react-bootstrap';
 import { firebaseService } from 'containers/App/firebase';
 import mapsApi from 'google-maps-api';
 import { GOOGLE_MAP_API_KEY } from './constants';
 import googleService from './services';
-
-// import styles from './styles.css';
+import styles from './styles.css';
 
 class FormModal extends React.Component { // eslint-disable-line react/prefer-stateless-function
     constructor(props) {
@@ -21,6 +20,11 @@ class FormModal extends React.Component { // eslint-disable-line react/prefer-st
             maps: null,
             edit: false,
             inprogress: false,
+            validation: {
+                streetName: { error: '' },
+                ward: { error: '' },
+                district: { error: '' },
+            },
         };
     }
 
@@ -48,7 +52,7 @@ class FormModal extends React.Component { // eslint-disable-line react/prefer-st
         }
     }
 
-    onGenerateAddress(values) {
+    onGenerateAddress(values, callback) {
         let address = '';
         if (values.streetName) {
             address += values.streetName;
@@ -69,25 +73,28 @@ class FormModal extends React.Component { // eslint-disable-line react/prefer-st
             address += `${values.country}`;
         }
 
-        setTimeout(googleService.getByAddress(address)
+        googleService.getByAddress(address)
             .then(response => response.json())
             .then(data => {
                 const item = {
                     ...values,
                 };
                 const address = data.results[0];
-                item.position = {
-                    lat: address.geometry.location.lat,
-                    lng: address.geometry.location.lng,
-                };
+                if (address.geometry) {
+                    item.position = {
+                        lat: address.geometry.location.lat,
+                        lng: address.geometry.location.lng,
+                    };
+                }
                 item.formatted_address = address.formatted_address;
                 this.setState({
                     center: item.position,
                     values: item,
                 }, () => {
                     this.initMap();
+                    callback(item);
                 });
-            }), 2000);
+            });
 
     }
 
@@ -96,11 +103,10 @@ class FormModal extends React.Component { // eslint-disable-line react/prefer-st
             const { values } = this.state;
             values[type] = event.target.value;
 
-            this.onGenerateAddress(values);
-
             this.setState({
                 values,
             });
+            this.validation(values);
         };
     }
 
@@ -157,13 +163,18 @@ class FormModal extends React.Component { // eslint-disable-line react/prefer-st
 
     submit = () => {
         const data = this.state.values;
-        if (!this.state.edit) {
-            data.id = (new Date()).getTime();
-            firebaseService.locations.create(data);
-        } else {
-            firebaseService.locations.update(data);
-        }
-        this.close();
+        this.validation(data, () => {
+            if (!this.state.edit) {
+                data.id = (new Date()).getTime();
+                this.onGenerateAddress(data, (item) => {
+                    console.log(item);
+                    firebaseService.locations.create(item);
+                });
+            } else {
+                firebaseService.locations.update(data);
+            }
+            this.close();
+        });
     }
 
     initMap = () => {
@@ -189,10 +200,50 @@ class FormModal extends React.Component { // eslint-disable-line react/prefer-st
         });
     }
 
+    validation = (values, submitFunc) => {
+        let validation = {
+            streetName: { error: '' },
+            ward: { error: '' },
+            district: { error: '' },
+        };
+        let totalInvalid = 0;
+
+        if (!values.streetName || values.streetName.trim() === '') {
+            validation = {
+                ...validation,
+                streetName: { error: 'Required' },
+            };
+            totalInvalid++;
+        }
+
+        if (!values.city || values.city.trim() === '') {
+            validation = {
+                ...validation,
+                ward: { error: 'Required' },
+                district: { error: 'Required' },
+            };
+            totalInvalid++;
+        } else {
+            validation = {
+                ...validation,
+                ward: { error: '' },
+                district: { error: '' },
+            };
+        }
+        console.log(totalInvalid);
+        this.setState({
+            validation,
+        });
+
+        if (totalInvalid === 0 && submitFunc) {
+            submitFunc();
+        }
+    }
+
     render() {
         const { show } = this.props;
 
-        const { values, edit } = this.state;
+        const { values, edit, validation } = this.state;
         return (
             <Modal show={show} onHide={this.close} dialogClassName="custom-modal">
                 <Modal.Header closeButton>
@@ -202,33 +253,36 @@ class FormModal extends React.Component { // eslint-disable-line react/prefer-st
                     <form className="form-horizontal">
                         <Row>
                             <Col md={6}>
-                                <Row className={classNames('form-group')}>
+                                <Row className={classNames('form-group', validation.streetName.error ? 'has-error' : '')}>
                                     <Col componentClass="label" md={4} className="control-label">
                                         Street Name <span className="required" aria-required="true"> * </span>
                                     </Col>
                                     <Col md={8}>
                                         <input type="text" name="streetName" className="form-control" placeholder="1 Le Duan" value={values.streetName} onChange={this.onChangeData('streetName')} />
+                                        <HelpBlock className="text-danger">{validation.streetName.error}</HelpBlock>
                                     </Col>
                                 </Row>
-                                <Row className={classNames('form-group')}>
+                                <Row className={classNames('form-group', validation.ward.error ? 'has-error' : '')}>
                                     <Col componentClass="label" md={4} className="control-label">
                                         Ward <span className="required" aria-required="true"> * </span>
                                     </Col>
                                     <Col md={8}>
                                         <input type="text" name="ward" className="form-control" placeholder="Da Kao" value={values.ward} onChange={this.onChangeData('ward')} />
+                                        <HelpBlock className="text-danger">{validation.ward.error}</HelpBlock>
                                     </Col>
                                 </Row>
-                                <Row className={classNames('form-group')}>
+                                <Row className={classNames('form-group', validation.district.error ? 'has-error' : '')}>
                                     <Col componentClass="label" md={4} className="control-label">
                                         District <span className="required" aria-required="true"> * </span>
                                     </Col>
                                     <Col md={8}>
                                         <input type="text" name="district" className="form-control" placeholder="District 1" value={values.district} onChange={this.onChangeData('district')} />
+                                        <HelpBlock className="text-danger">{validation.district.error}</HelpBlock>
                                     </Col>
                                 </Row>
                                 <Row className={classNames('form-group')}>
                                     <Col componentClass="label" md={4} className="control-label">
-                                        City <span className="required" aria-required="true"> * </span>
+                                        City
                                     </Col>
                                     <Col md={8}>
                                         <input type="text" name="city" className="form-control" placeholder="Ho Chi Minh" value={values.city} onChange={this.onChangeData('city')} />
@@ -236,7 +290,7 @@ class FormModal extends React.Component { // eslint-disable-line react/prefer-st
                                 </Row>
                                 <Row className={classNames('form-group')}>
                                     <Col componentClass="label" md={4} className="control-label">
-                                        Country <span className="required" aria-required="true"> * </span>
+                                        Country
                                     </Col>
                                     <Col md={8}>
                                         <input type="text" name="country" className="form-control" placeholder="Viet Nam" value={values.country} onChange={this.onChangeData('country')} />
@@ -244,7 +298,7 @@ class FormModal extends React.Component { // eslint-disable-line react/prefer-st
                                 </Row>
                             </Col>
                             <Col md={6}>
-                                <div id="map" className="map" style={{ height: '300px' }}></div>
+                                <div id="map" className="map"></div>
                             </Col>
                         </Row>
                     </form>

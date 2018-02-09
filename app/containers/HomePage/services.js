@@ -1,4 +1,4 @@
-// https://maps.googleapis.com/maps/api/geocode/json?address=1600+Amphitheatre+Parkway,+Mountain+View,+CA&key=YOUR_API_KEY
+
 import { GOOGLE_MAP_API_KEY } from './constants';
 
 const googleService = {

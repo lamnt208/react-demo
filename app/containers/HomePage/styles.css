@@ -1,7 +1,11 @@
 .custom-modal {
-    width: 90%;
+    width: 90% !important;
 }
 
 .map {
-    height: 400px;
+    height: 500px;
+}
+
+.btn-action {
+    margin-bottom: 20px;
 }
