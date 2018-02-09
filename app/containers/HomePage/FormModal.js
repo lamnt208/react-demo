@@ -169,11 +169,12 @@ class FormModal extends React.Component { // eslint-disable-line react/prefer-st
                 this.onGenerateAddress(data, (item) => {
                     console.log(item);
                     firebaseService.locations.create(item);
+                    this.close();
                 });
             } else {
                 firebaseService.locations.update(data);
+                this.close();
             }
-            this.close();
         });
     }
 
